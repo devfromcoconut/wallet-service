@@ -68,3 +68,4 @@ This service only includes the minimal dependencies required for wallet operatio
 - Zod for validation
 - And other essential packages
 # wallet-service
+# wallet-service
