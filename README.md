@@ -67,3 +67,4 @@ This service only includes the minimal dependencies required for wallet operatio
 - JWT for authentication
 - Zod for validation
 - And other essential packages
+# wallet-service
