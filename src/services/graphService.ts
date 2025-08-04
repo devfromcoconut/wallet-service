@@ -5,7 +5,7 @@ interface Address {
   line2?: string;
   city: string;
   state: string;
-  country: string; // ISO Alpha-2 code, e.g., 'US', 'NG'
+  country: string;
   postal_code: string;
 }
 
