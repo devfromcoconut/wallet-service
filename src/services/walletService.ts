@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { Transaction } from "../models/Transaction";
 import { generateTxId } from "../utils/otp";
 import {flattenObject} from "../utils/flatten";
+import { ApiPayload, submitKycData } from "./graphService";
 
 export class WalletService {
   private flutterwaveBaseUrl = env.FLUTTERWAVE_BASE_URL;
@@ -119,165 +120,196 @@ export class WalletService {
   }
 
   async createWallet(
-    businessId: string,
-    email: string,
-    phoneNumber: string,
-    firstName: string,
-    lastName: string,
-    bvn: string,
-    narration: string,
-    primary?: boolean,
-    businessName? : string
-  ) {
-    try {
-      // **Validate businessId format**
-      if (!mongoose.Types.ObjectId.isValid(businessId)) {
-        throw new Error("Invalid businessId format");
-      }
-
-      // // // **Check if business exists**
-      const businessExists = await Business.findById(businessId);
-      if (!businessExists) {
-        throw new Error("Business not found");
-      }
-    
-      // Generate a unique transaction reference
-      const txRef = `${firstName}_${Date.now()}`;
-
-      // Flutterwave API request payload
-      const requestData = {
-        email, //CORRUPT THIS EMAIL
-        tx_ref: txRef,
-        phonenumber: phoneNumber,
-        is_permanent: true,
-        firstname: firstName,
-        lastname: lastName,
-        narration,
-        bvn,
-      };
-
-
-      const customer = {
-        customer_first_name: firstName,
-        customer_last_name: lastName,
-        customer_phone: phoneNumber,
-        customer_email: email,
-        customer_address: "h",
-        customer_state: "h",
-        customer_city: "h"
-      };
-      
-  
-      console.log("creating new customer", customer)
-
-      // Call Bani API
-      const response = await axios.post(
-        `${this.baniBaseUrl}comhub/add_my_customer/`,
-        customer,
-        {
-          headers: { 
-            Authorization: `Bearer ${this.baniToken}`,
-            "Content-Type": "application/json",
-            "moni-signature": this.moniSignature,
-          },
-        }
-      );
-
-      console.log("customer created")
-
-      
-      const responseData = response.data;
-      if (!responseData.status) {
-      console.log("failed to create customer")
-
-        throw new Error("Failed to create virtual account");
-      }
-
-      const {
-        customer_ref
-      } = responseData;
-
-      const walletPayload = {
-        pay_va_step: "direct",
-        country_code: "NG",
-        pay_currency: "NGN",
-        holder_account_type: "permanent",
-        customer_ref,
-        pay_ext_ref: txRef,
-        alternate_name: businessName? businessName : firstName + " " + lastName,
-        holder_legal_number: bvn,
-        bank_name: "guaranty trust bank",
-      }
-
-      const walletResponse = await axios.post(
-        `${this.baniBaseUrl}partner/collection/bank_transfer/`,
-        walletPayload,
-        {
-          headers: { 
-            Authorization: `Bearer ${this.baniToken}`,
-            "Content-Type": "application/json",
-            "moni-signature": this.moniSignature,
-          },
-        }
-      );
-      console.log("created new bank", walletResponse.data)
-
-
-
-      const {
-        payment_reference,
-        holder_account_number,
-        holder_bank_name,
-        amount,
-        payment_ext_reference,
-        account_type,
-        account_name
-      } = walletResponse.data;
-      
-
-
-      //Business account implementation
-      const oldWallet = await Wallet.findOne({ businessId });
-      if (oldWallet) {
-        oldWallet.business_account_number = holder_account_number;
-        oldWallet.business_bank_name = holder_bank_name;
-        await oldWallet.save();
-
-        return oldWallet;
-      }
-
-      // Create and save the wallet in MongoDB
-
-
-      const wallet = await Wallet.create({
-        businessId,
-        balance: 0,
-        currency: "NGN", // Change if dynamic
-        narration,
-        txRef,
-        flwRef: txRef,
-        orderRef: txRef,
-        accountNumber: Number(holder_account_number),
-        accountStatus: "ACTIVE",
-        bankName: holder_bank_name,
-        primary,
-        firstName,
-        lastName,
-        email, //Use the Uncorrupted email here
-        phoneNumber,
-        createdAt: new Date(),
-      });
-
-      return wallet;
-
-      // return walletResponse.data;
-    } catch (error: any) {
-
-      throw new Error(
-        `Error creating wallet: ${error?.response?.data?.message}`
-      );
+  businessId: string,
+  email: string,
+  phoneNumber: string,
+  firstName: string,
+  lastName: string,
+  bvn: string,
+  narration: string,
+  primary?: boolean,
+  businessName?: string
+) {
+  try {
+    // Validate businessId format
+    if (!mongoose.Types.ObjectId.isValid(businessId)) {
+      throw new Error("Invalid businessId format");
     }
+
+    // Check if business exists
+    const businessExists = await Business.findById(businessId);
+    if (!businessExists) {
+      throw new Error("Business not found");
+    }
+
+    // Generate a unique transaction reference
+    const txRef = `${firstName}_${Date.now()}`;
+
+    // Flutterwave API request payload
+    const requestData = {
+      email,
+      tx_ref: txRef,
+      phonenumber: phoneNumber,
+      is_permanent: true,
+      firstname: firstName,
+      lastname: lastName,
+      narration,
+      bvn,
+    };
+
+    const customer = {
+      customer_first_name: firstName,
+      customer_last_name: lastName,
+      customer_phone: phoneNumber,
+      customer_email: email,
+      customer_address: "h",
+      customer_state: "h",
+      customer_city: "h"
+    };
+
+    console.log("creating new customer", customer);
+
+    // Call Bani API
+    const response = await axios.post(
+      `${this.baniBaseUrl}comhub/add_my_customer/`,
+      customer,
+      {
+        headers: { 
+          Authorization: `Bearer ${this.baniToken}`,
+          "Content-Type": "application/json",
+          "moni-signature": this.moniSignature,
+        },
+      }
+    );
+
+    console.log("customer created");
+
+    const responseData = response.data;
+    if (!responseData.status) {
+      console.log("failed to create customer");
+      throw new Error("Failed to create virtual account");
+    }
+
+    const { customer_ref } = responseData;
+
+    const walletPayload = {
+      pay_va_step: "direct",
+      country_code: "NG",
+      pay_currency: "NGN",
+      holder_account_type: "permanent",
+      customer_ref,
+      pay_ext_ref: txRef,
+      alternate_name: businessName ? businessName : firstName + " " + lastName,
+      holder_legal_number: bvn,
+      bank_name: "guaranty trust bank",
+    };
+
+    const walletResponse = await axios.post(
+      `${this.baniBaseUrl}partner/collection/bank_transfer/`,
+      walletPayload,
+      {
+        headers: { 
+          Authorization: `Bearer ${this.baniToken}`,
+          "Content-Type": "application/json",
+          "moni-signature": this.moniSignature,
+        },
+      }
+    );
+    console.log("created new bank", walletResponse.data);
+
+    const {
+      payment_reference,
+      holder_account_number,
+      holder_bank_name,
+      amount,
+      payment_ext_reference,
+      account_type,
+      account_name
+    } = walletResponse.data;
+
+    // Business account implementation
+    const oldWallet = await Wallet.findOne({ businessId });
+    if (oldWallet) {
+      oldWallet.business_account_number = holder_account_number;
+      oldWallet.business_bank_name = holder_bank_name;
+      await oldWallet.save();
+      // Submit KYC data for existing wallet
+      const kycPayload: ApiPayload = {
+        name_first: firstName,
+        name_last: lastName,
+        name_other: "",
+        phone: phoneNumber,
+        email,
+        dob: "1990-01-01", // Placeholder, replace with actual DOB if available
+        id_number: bvn, // Using BVN as ID number; replace if needed
+        id_country: "NG",
+        bank_id_number: bvn,
+        address: {
+          line1: "123 Lagos Street", // Placeholder
+          city: "Lagos",
+          state: "Lagos",
+          country: "NG",
+          postal_code: "100001"
+        }
+      };
+      const kycResponse = await submitKycData(kycPayload);
+      console.log("KYC submitted for existing wallet", kycResponse);
+      return { wallet: oldWallet, kycResponse };
+    }
+
+    // Create and save the wallet in MongoDB
+    const wallet = await Wallet.create({
+      businessId,
+      balance: 0,
+      currency: "NGN",
+      narration,
+      txRef,
+      flwRef: txRef,
+      orderRef: txRef,
+      accountNumber: Number(holder_account_number),
+      accountStatus: "ACTIVE",
+      bankName: holder_bank_name,
+      primary,
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      createdAt: new Date(),
+    });
+
+    // Submit KYC data
+    const kycPayload: ApiPayload = {
+      name_first: firstName,
+      name_last: lastName,
+      name_other: "",
+      phone: phoneNumber,
+      email,
+      dob: "1990-01-01",
+      id_number: bvn, 
+      id_country: "NG",
+      bank_id_number: bvn,
+      id_type: "nin",
+      id_level: "primary",
+      address: {
+        line1: "123 Lagos Street", // Placeholder
+        city: "Lagos",
+        state: "Lagos",
+        country: "NG",
+        postal_code: "100001"
+      }
+    };
+
+    const kycResponse = await submitKycData(kycPayload);
+    console.log("KYC submitted", kycResponse);
+
+    return { wallet, kycResponse };
+
+  } catch (error: any) {
+    throw new Error(
+      `Error creating wallet: ${error?.response?.data?.message || error.message}`
+    );
   }
+}
 
   /**
    * Get all bank details from Flutterwave
