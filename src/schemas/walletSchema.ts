@@ -1,5 +1,62 @@
 import { z } from "zod";
 
+type Address = {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+};
+
+type BackgroundDocument = {
+  file: File;
+  issueDate: string;
+  expiryDate: string;
+};
+
+export type KycMapped = {
+  name_first: string;
+  name_last: string;
+  name_other: string;
+  phone: string;
+  email: string;
+  dob: string;
+  id_level?: string;
+  id_type?: string;
+  id_number: string;
+  id_country: string;
+  bank_id_number?: string;
+  kyc_level?: string;
+  address: Address;
+  background_information?: {
+    documents?: BackgroundDocument[];
+  };
+};
+
+
+export type KycStateFlat = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  otherName: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  typeId: string;
+  issueDate: string;
+  expiryDate: string;
+  issuingCountry: string;
+  bvnNumber: string;
+  identificationNumber: string;
+  identificationFile: string;
+  postalCode: string; // Optional field for postal code
+};
+
 export const createWalletSchema = z.object({
   businessId: z.string().min(1, "Business ID is required"),
   email: z.string().min(1, "Email is required"),
@@ -34,4 +91,28 @@ export const processPaymentSchema = z.object({
 
 export const getTransactionsByWalletId = z.object({
   walletId: z.string().min(1, "Wallet ID is required"),
+});
+
+export const kycSchema = z.object({
+  // Personal Details
+  firstName: z.string(),
+  lastName: z.string(),
+  otherName: z.string(),
+  phoneNumber: z.string(),
+  dateOfBirth: z.string(), // Consider refining to z.coerce.date() if using real dates
+  address1: z.string(),
+  address2: z.string(),
+  city: z.string(),
+  state: z.string(),
+  country: z.string(),
+
+  // Identification
+  typeId: z.string(),
+  issueDate: z.string(), // Same: you might want to validate date format
+  expiryDate: z.string(),
+  issuingCountry: z.string(),
+  bvnNumber: z.string(),
+  identificationNumber: z.string(),
+  identificationFile: z.string(), // matches File | null
+  postalCode: z.string(), // Optional postal code
 });

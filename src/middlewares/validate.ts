@@ -34,13 +34,14 @@ export const validate = (
 
     // If there are errors, return response
     if (Object.keys(errors).length > 0) {
+      console.log("Validation errors:", errors, "body: ", req.body);
       return res.status(400).json({
         success: false,
         message: "Validation Error",
         errors,
       });
     }
-
+  
     next();
   };
 };

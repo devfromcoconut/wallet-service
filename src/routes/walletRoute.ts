@@ -6,6 +6,7 @@ import {
   updateBvnSchema,
   transferToBankSchema,
   getTransactionsByWalletId,
+  kycSchema,
 } from "../schemas/walletSchema";
 import { protect } from "../middlewares/auth";
 import { validate } from "../middlewares/validate";
@@ -840,6 +841,10 @@ router.get(
   protect,
   validate({ params: getTransactionsByWalletId }),
   walletController.getTransactionsByWalletId
+);
+
+router.post(
+  "/kyc-verify", validate({ body: kycSchema }), walletController.verifyKyc
 );
 
 export default router;

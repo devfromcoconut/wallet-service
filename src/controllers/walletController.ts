@@ -4,9 +4,63 @@ import { Wallet } from "../models/Wallet";
 import { sendErrorResponse } from "../utils/sendResponse";
 import { Transaction } from "../models/Transaction";
 import { User } from "../models/User";
+import { GraphService, PersonPayload } from "../services/graphService";
+import { KycMapped, KycStateFlat } from "../schemas/walletSchema";
 
 interface AuthRequest extends Request {
   user?: any;
+}
+
+
+function mapKycStateToPayload(input: KycStateFlat): PersonPayload {
+  return {
+    name_first: input.firstName,
+    name_last: input.lastName,
+    name_other: input.otherName,
+    phone: input.phoneNumber,
+    email: input.email,
+    dob: input.dateOfBirth,
+    id_type: input.typeId,
+    id_number: input.identificationNumber,
+    id_country: input.issuingCountry,
+    bank_id_number: input.bvnNumber,
+    id_level: "secondary",
+    kyc_level: "basic",
+    address: {
+      line1: input.address1,
+      line2: input.address2 || "", // Ensure line2 is a string
+      city: input.city,
+      state: input.state,
+      country: input.country,
+      postal_code: input.postalCode, // Ensure postal_code is a string
+    },
+    documents: [{
+      type: input.typeId,
+      url: input.identificationFile,
+      issue_date: input.issueDate,
+      expiry_date: input.expiryDate,
+    }]
+    // address_line1: input.address1,
+    // address_city: input.city,
+    // address_state: input.state,
+    // address_country: input.country,
+    // line1: input.address1,
+    // city: input.city,
+    // state: input.state,
+    // country: input.country,
+    // postal_code: input.postal_code || "", // Ensure postal_code is a string
+    // background_information: input.identificationFile
+    //   ? {
+    //       documents: [
+    //         {
+    //           file: input.identificationFile,
+    //           issueDate: input.issueDate,
+    //           expiryDate: input.expiryDate,
+    //         },
+    //       ],
+    //     }
+    //   : undefined,
+  };
 }
 
 export class WalletController {
@@ -365,6 +419,22 @@ export class WalletController {
       return res
         .status(200)
         .json({ message: "BVN updated successfully", data: updatedWallet });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+
+  async verifyKyc(req: Request, res: Response) {
+    const bankingService = new GraphService();
+    try {
+      const data = req.body;
+      const response = await bankingService.createPerson(mapKycStateToPayload(data));
+      // remove id from response
+      // call the create account endpoint
+      res.status(201).json({
+        success: true,
+        data: response.data
+      })
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }

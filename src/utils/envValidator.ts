@@ -24,6 +24,9 @@ const envSchema = z.object({
   BANI_TOKEN: z.string().min(1, "BANI_TOKEN is required"),
   BANI_MONI_SIGNATURE: z.string().min(1, "BANI_MONI_SIGNATURE is required"),
   BANI_SHARED_KEY: z.string().min(1, "BANI_MONI_SIGNATURE is required"),
+
+  //Graph
+  GRAPH_SECRET_KEY: z.string().min(1, "GRAPH_SECRET_KEY is required"),
 });
 
 export const env = envSchema.parse(process.env);
